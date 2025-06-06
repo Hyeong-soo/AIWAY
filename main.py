@@ -1,1 +1,7 @@
-print("This is test.")
+"""Entry point for the MCP time service."""
+
+from service import app
+
+if __name__ == "__main__":
+    app.run()
+
