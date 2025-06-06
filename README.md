@@ -1,4 +1,4 @@
-# aiway
+# MCP
 
 이 프로젝트는 Model Context Protocol(MCP)을 이용해 현재 시간을 제공하는 간단한 도구와 이를 사용하는 예제 서버를 포함합니다.
 
