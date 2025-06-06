@@ -2,9 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from mcp.server.fastmcp import FastMCP
-
-app = FastMCP(name="time-service")
+from ..mcp_server import app
 
 
 @app.tool()
@@ -21,5 +19,4 @@ def calculate_discharge_date(start_date: str, service_days: int) -> str:
     return discharge.date().isoformat()
 
 
-__all__ = ["app", "get_current_time", "calculate_discharge_date"]
-
+__all__ = ["get_current_time", "calculate_discharge_date"]
