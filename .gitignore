@@ -41,3 +41,7 @@ node_modules/
 # ✅ 기타 프로젝트별 불필요 파일
 *.sqlite3
 *.db
+
+# goorm IDE manifest
+.goorm.manifest
+
