@@ -1,22 +1,13 @@
 """Time utilities exposed as MCP tools."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
+import pytz
 
-from ..mcp_server import app
-
-
-@app.tool()
-def get_current_time() -> str:
-    """Return the current system time as an ISO string."""
-    return datetime.now().isoformat()
-
-
-@app.tool()
-def calculate_discharge_date(start_date: str, service_days: int) -> str:
-    """Return the date after completing the given number of service days."""
-    start_dt = datetime.fromisoformat(start_date)
-    discharge = start_dt + timedelta(days=service_days)
-    return discharge.date().isoformat()
+def get_current_time(params):  # 반드시 인자 하나 있어야 함
+    now = datetime.now(pytz.timezone("Asia/Seoul"))
+    return {
+        "time": now.strftime("%Y-%m-%d %H:%M:%S")
+    }
 
 
-__all__ = ["get_current_time", "calculate_discharge_date"]
+__all__ = ["get_current_time"]

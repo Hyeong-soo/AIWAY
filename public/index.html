@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>MCP GPT 연동 테스트</title>
+</head>
+<body>
+  <h2>지금 시간을 MCP를 활용해 알려드려요!</h2>
+  <input id="userInput" type="text" placeholder="예: 지금 몇 시야?">
+  <button onclick="askGPT()">시간 물어보기</button>
+
+  <h3>GPT가 말아주는 MCP</h3>
+  <div id="responseBox"></div>
+
+  <script>
+      async function askGPT() {
+      const input = document.getElementById('userInput').value;
+      const responseBox = document.getElementById('responseBox');
+      responseBox.innerText = '';
+
+      const response = await fetch("/ask", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({question: input})
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        responseBox.innerText += chunk;
+      }
+    }
+    </script>
+</body>
+</html>
