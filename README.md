@@ -20,15 +20,19 @@ MCP_SERVER_URL=http://localhost:8000/mcp
 
 ## 실행 방법
 
-1. MCP 서버 실행
+1. 의존성 설치
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. MCP 서버 실행
    ```bash
    uvicorn mcp_demo.mcp_server:app
    ```
-2. 예제 API 서버 실행
+3. 예제 API 서버 실행
    ```bash
    python3 main.py
    ```
-3. 브라우저에서 `http://localhost:8000` 에 접속하여 질문을 입력하면 GPT가 MCP 도구를 호출해 현재 시간을 알려줍니다.
+4. 브라우저에서 `http://localhost:8000` 에 접속하여 질문을 입력하면 GPT가 MCP 도구를 호출해 현재 시간을 알려줍니다.
 
 ### 직접 도구 호출 예시
 
