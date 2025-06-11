@@ -43,5 +43,6 @@ node_modules/
 *.db
 
 # goorm IDE manifest
+goorm.manifest
 .goorm.manifest
 
