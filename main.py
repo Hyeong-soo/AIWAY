@@ -9,6 +9,16 @@ load_dotenv()
 MCP_URL = os.getenv("MCP_SERVER_URL")
 API_KEY = os.getenv("OPENAI_API_KEY")
 
+missing = []
+if not MCP_URL:
+    missing.append("MCP_SERVER_URL")
+if not API_KEY:
+    missing.append("OPENAI_API_KEY")
+if missing:
+    raise EnvironmentError(
+        f"Missing required environment variables: {', '.join(missing)}"
+    )
+
 openai_client = openai.OpenAI(api_key=API_KEY)
 
 app = FastAPI()
