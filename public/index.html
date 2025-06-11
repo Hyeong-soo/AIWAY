@@ -1,39 +1,210 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>MCP GPT 연동 테스트</title>
-</head>
-<body>
-  <h2>지금 시간을 MCP를 활용해 알려드려요!</h2>
-  <input id="userInput" type="text" placeholder="예: 지금 몇 시야?">
-  <button onclick="askGPT()">시간 물어보기</button>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AIWAY</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #f9f9f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      color: #111;
+      overflow-x: hidden;
+    }
 
-  <h3>GPT가 말아주는 MCP</h3>
-  <div id="responseBox"></div>
+    body {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  <script>
-      async function askGPT() {
-      const input = document.getElementById('userInput').value;
-      const responseBox = document.getElementById('responseBox');
-      responseBox.innerText = '';
+    .transcript {
+      position: absolute;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.95rem;
+      color: #444;
+      text-align: center;
+      max-width: 90vw;
+      word-break: break-word;
+      z-index: 150;
+    }
 
-      const response = await fetch("/ask", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({question: input})
-      });
+    .response {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2rem;
+      color: #222;
+      max-width: 90vw;
+      text-align: center;
+      word-break: break-word;
+      padding: 0 1rem;
+      min-height: 3rem;
+      z-index: 200;
+      pointer-events: none;
+    }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+    .mic-container {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120vw;
+      height: 100px;
+      background: #fff url('/static/soundwave_icon.png') no-repeat center 35%;
+      background-size: 48px;
+      border-top-left-radius: 100% 50px;
+      border-top-right-radius: 100% 50px;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-top: 20px;
+      z-index: 100;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        responseBox.innerText += chunk;
+    .mic-container:active {
+      transform: translateX(-50%) scale(0.97);
+      background-color: #f0f0f0;
+    }
+
+    .record-progress {
+      position: absolute;
+      bottom: 15px;
+      width: 80%;
+      height: 6px;
+      background-color: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .record-progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #007aff;
+      animation: progressAnim 4s linear forwards;
+    }
+
+    @keyframes progressAnim {
+      from { width: 0%; }
+      to { width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+      .transcript {
+        bottom: 130px;
+        font-size: 0.9rem;
+      }
+
+      .response {
+        font-size: 1.05rem;
+      }
+
+      .mic-container {
+        height: 90px;
+        background-size: 40px;
+        border-top-left-radius: 100% 45px;
+        border-top-right-radius: 100% 45px;
+      }
+
+      .record-progress {
+        width: 85%;
+        height: 5px;
       }
     }
-    </script>
+  </style>
+</head>
+<body>
+  <div class="transcript" id="transcriptText"></div>
+  <div class="response" id="responseText"></div>
+
+  <div class="mic-container" id="micContainer">
+    <div class="record-progress" id="progressContainer" style="display: none;">
+      <div class="record-progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <script>
+    const micArea = document.getElementById("micContainer");
+    const transcriptText = document.getElementById("transcriptText");
+    const responseText = document.getElementById("responseText");
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+
+    let mediaRecorder;
+    let audioChunks = [];
+
+    micArea.addEventListener("click", async () => {
+      try {
+        transcriptText.textContent = "";
+        responseText.textContent = "";
+        audioChunks = [];
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          progressContainer.style.display = "none";
+          progressBar.style.width = "0%";
+
+          const blob = new Blob(audioChunks, { type: "audio/webm" });
+          const formData = new FormData();
+          formData.append("audio", blob, "recording.webm");
+
+          const transcribeRes = await fetch("/transcribe", {
+            method: "POST",
+            body: formData
+          });
+
+          const { text } = await transcribeRes.json();
+          transcriptText.textContent = text || "마이크 권한이 필요합니다.";
+          if (!text) return;
+
+          const askRes = await fetch("/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: [{ role: "user", content: text }] })
+          });
+
+          const reader = askRes.body.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            console.log("GPT 응답:", chunk);
+            responseText.textContent += chunk;
+          }
+        };
+
+        mediaRecorder.start();
+        progressContainer.style.display = "block";
+        progressBar.style.animation = "progressAnim 4s linear forwards";
+
+        setTimeout(() => {
+          if (mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+          }
+        }, 4000);
+      } catch (err) {
+        console.error("마이크 접근 오류:", err);
+        transcriptText.textContent = "마이크 권한이 필요합니다.";
+      }
+    });
+  </script>
 </body>
 </html>
