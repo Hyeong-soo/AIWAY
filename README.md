@@ -15,7 +15,7 @@
 
 ```env
 OPENAI_API_KEY=여기에-OpenAI-키를-입력하세요
-MCP_SERVER_URL=http://localhost:8000/mcp
+MCP_SERVER_URL=http://localhost:8001/mcp
 ```
 
 ## 실행 방법
@@ -26,11 +26,11 @@ MCP_SERVER_URL=http://localhost:8000/mcp
    ```
 2. MCP 서버 실행
    ```bash
-   uvicorn mcp_demo.mcp_server:app
+   uvicorn mcp_demo.mcp_server:app --port 8001
    ```
-3. 예제 API 서버 실행
+3. 예제 API 서버 실행 (또는 원하는 포트 지정)
    ```bash
-   python3 main.py
+   uvicorn main:app --port 8000
    ```
 4. 브라우저에서 `http://localhost:8000` 에 접속하여 질문을 입력하면 GPT가 MCP 도구를 호출해 현재 시간을 알려줍니다.
 
@@ -39,7 +39,7 @@ MCP_SERVER_URL=http://localhost:8000/mcp
 MCP 서버에 직접 요청을 보내는 방법은 다음과 같습니다.
 
 ```bash
-curl -X POST http://localhost:8000/mcp \
+curl -X POST http://localhost:8001/mcp \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"get_current_time","params":{},"id":"1"}'
 ```
