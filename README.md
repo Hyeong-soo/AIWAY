@@ -1,6 +1,6 @@
-# MCP
+# AIWAY
 
-이 프로젝트는 Model Context Protocol(MCP)을 이용해 현재 시간을 제공하는 간단한 도구와 이를 사용하는 예제 서버를 포함합니다.
+디지털 서비스 접근이 어려운 노인들을 위해 S2S 기반의 액션 AI Agent
 
 ## 구성
 
