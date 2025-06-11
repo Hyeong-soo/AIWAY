@@ -18,13 +18,10 @@ load_dotenv()
 MCP_URL = os.getenv("MCP_SERVER_URL")
 API_KEY = os.getenv("OPENAI_API_KEY")
 
-<<<<<<< HEAD
 # 로깅
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# OpenAI 클라이언트 초기화
-=======
 missing = []
 if not MCP_URL:
     missing.append("MCP_SERVER_URL")
@@ -35,7 +32,7 @@ if missing:
         f"Missing required environment variables: {', '.join(missing)}"
     )
 
->>>>>>> 6bc0978ebc0ef54e2287144c2ec357f34d07b76a
+# OpenAI 클라이언트 초기화
 openai_client = openai.OpenAI(api_key=API_KEY)
 
 # FastAPI 앱 초기화
