@@ -1,36 +1,45 @@
-# aiway
+# MCP
 
-This project demonstrates simple time utilities exposed as tools via the
-Model Context Protocol (MCP).
+이 프로젝트는 Model Context Protocol(MCP)을 이용해 현재 시간을 제공하는 간단한 도구와 이를 사용하는 예제 서버를 포함합니다.
 
-## Service utilities
+## 구성
 
-The package `mcp_demo` contains the MCP server and its tools.
+- `mcp_demo/mcp_server.py` : MCP 요청을 처리하는 FastAPI 서버입니다. `/mcp` 경로에서 JSON-RPC 형식으로 도구를 호출할 수 있습니다.
+- `mcp_demo/tools/time_tool.py` : `get_current_time()` 함수를 정의하며, 서울 시간 기준 현재 시각을 반환합니다.
+- `main.py` : OpenAI API와 MCP 서버를 연동하여 질문에 따라 도구를 호출하고, 결과를 스트리밍 방식으로 전달합니다.
+- `public/index.html` : 웹 브라우저에서 시간을 질문해 볼 수 있는 간단한 페이지입니다.
 
-`tools/time_tool.py` defines two utilities:
-- `get_current_time()` returns the current system time as an ISO string.
-- `calculate_discharge_date(start_date, service_days)` returns the discharge
-  date after the given number of service days.
+## 환경 변수
 
-## Example
+`.env` 파일에 다음 값을 설정해야 합니다.
 
-Run `python3 main.py` to start the FastAPI-based MCP server. It listens on
-`http://localhost:8000`. Tools can then be invoked by sending JSON-RPC requests
-to the `/mcp` endpoint. For quick testing you can
-call the functions directly in Python:
-
-```python
-from mcp_demo.tools.time_tool import get_current_time, calculate_discharge_date
-
-print(get_current_time())
-print(calculate_discharge_date("2023-01-01", 540))
+```env
+OPENAI_API_KEY=여기에-OpenAI-키를-입력하세요
+MCP_SERVER_URL=http://localhost:8000/mcp
 ```
 
-To invoke the tool over HTTP:
+## 실행 방법
+
+1. 의존성 설치
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. MCP 서버 실행
+   ```bash
+   uvicorn mcp_demo.mcp_server:app
+   ```
+3. 예제 API 서버 실행
+   ```bash
+   python3 main.py
+   ```
+4. 브라우저에서 `http://localhost:8000` 에 접속하여 질문을 입력하면 GPT가 MCP 도구를 호출해 현재 시간을 알려줍니다.
+
+### 직접 도구 호출 예시
+
+MCP 서버에 직접 요청을 보내는 방법은 다음과 같습니다.
 
 ```bash
 curl -X POST http://localhost:8000/mcp \
      -H "Content-Type: application/json" \
-     -d '{"jsonrpc": "2.0", "method": "get_current_time", "params": {}, "id": "1"}'
+     -d '{"jsonrpc":"2.0","method":"get_current_time","params":{},"id":"1"}'
 ```
-
