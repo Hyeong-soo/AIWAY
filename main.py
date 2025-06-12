@@ -10,6 +10,7 @@ import os
 import logging
 import mimetypes
 import tempfile
+import subprocess
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -145,27 +146,58 @@ async def ask(request: Request):
         logger.exception("/ask 처리 중 예외 발생")
         return JSONResponse(status_code=500, content={"error": f"서버 오류: {str(e)}"})
 
+
+# ffprobe를 이용해 실제 포맷 확인 함수
+def get_audio_info(path):
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=format_name",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5
+        )
+        return result.stdout.strip()
+    except Exception as e:
+        return f"ffprobe error: {str(e)}"
+
 @app.post("/transcribe")
 async def transcribe(audio: UploadFile = File(...)):
     try:
         logger.info(f"Received audio file: {audio.filename}")
+        logger.info(f"Declared MIME type: {audio.content_type}")
 
         suffix = mimetypes.guess_extension(audio.content_type or '') or ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
             contents = await audio.read()
+
+            if not contents:
+                raise ValueError("업로드된 오디오 파일이 비어있습니다.")
+
             temp.write(contents)
             temp.flush()
             temp_path = temp.name
 
+        # ffprobe로 실제 포맷 확인
+        detected_format = get_audio_info(temp_path)
+        logger.info(f"Detected audio format by ffprobe: {detected_format}")
+
+        # OpenAI Whisper STT 요청
         try:
             with open(temp_path, "rb") as f:
                 transcript = openai_client.audio.transcriptions.create(
                     model="whisper-1",
                     file=f,
-                    response_format="json"
+                    response_format="json",
+                    language="ko"
                 )
         finally:
-            os.remove(temp_path)  # 파일 삭제
+            os.remove(temp_path)
 
         logger.info(f"Transcript: {transcript.text}")
         return {"text": transcript.text or ""}
