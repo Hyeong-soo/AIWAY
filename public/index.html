@@ -100,26 +100,15 @@
     }
 
     @media (max-width: 480px) {
-      .transcript {
-        bottom: 130px;
-        font-size: 0.9rem;
-      }
-
-      .response {
-        font-size: 1.05rem;
-      }
-
+      .transcript { bottom: 130px; font-size: 0.9rem; }
+      .response { font-size: 1.05rem; }
       .mic-container {
         height: 90px;
         background-size: 40px;
         border-top-left-radius: 100% 45px;
         border-top-right-radius: 100% 45px;
       }
-
-      .record-progress {
-        width: 85%;
-        height: 5px;
-      }
+      .record-progress { width: 85%; height: 5px; }
     }
   </style>
 </head>
@@ -142,6 +131,7 @@
 
     let mediaRecorder;
     let audioChunks = [];
+    let messageHistory = [];
 
     micArea.addEventListener("click", async () => {
       try {
@@ -174,20 +164,43 @@
           transcriptText.textContent = text || "마이크 권한이 필요합니다.";
           if (!text) return;
 
-          const askRes = await fetch("/ask", {
+          messageHistory.push({ role: "user", content: text });
+          if (messageHistory.length > 10) {
+            messageHistory = messageHistory.slice(-10);
+          }
+
+          const speakRes = await fetch("/speak", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: [{ role: "user", content: text }] })
+            body: JSON.stringify({ messages: messageHistory })
           });
 
-          const reader = askRes.body.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            console.log("GPT 응답:", chunk);
-            responseText.textContent += chunk;
+          const { text: reply, audio } = await speakRes.json();
+          responseText.textContent = reply || "(응답 없음)";
+
+          if (reply) {
+            messageHistory.push({ role: "assistant", content: reply });
+            if (messageHistory.length > 10) {
+              messageHistory = messageHistory.slice(-10);
+            }
+          }
+
+          if (audio) {
+            const audioEl = new Audio();
+            audioEl.src = "data:audio/mp3;base64," + audio;
+            audioEl.load();
+            audioEl.muted = true;
+
+            try {
+              await audioEl.play();
+              audioEl.muted = false;
+            } catch (e) {
+              await fetch("/log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: "오디오 재생 실패: " + e.message })
+              });
+            }
           }
         };
 
@@ -201,7 +214,6 @@
           }
         }, 4000);
       } catch (err) {
-        console.error("마이크 접근 오류:", err);
         transcriptText.textContent = "마이크 권한이 필요합니다.";
       }
     });

@@ -1,37 +1,35 @@
 from fastapi import FastAPI, Request, UploadFile, File
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 import openai
-import requests
-import json
 import os
 import logging
 import mimetypes
 import tempfile
 import subprocess
-
+import requests
+import base64
 from dotenv import load_dotenv
-load_dotenv()
 
-# 환경변수
+# 환경 변수 로드
+load_dotenv()
 MCP_URL = os.getenv("MCP_SERVER_URL")
 API_KEY = os.getenv("OPENAI_API_KEY")
 
-# 로깅
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+# 필수 체크
 missing = []
 if not MCP_URL:
     missing.append("MCP_SERVER_URL")
 if not API_KEY:
     missing.append("OPENAI_API_KEY")
 if missing:
-    raise EnvironmentError(
-        f"Missing required environment variables: {', '.join(missing)}"
-    )
+    raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # OpenAI 클라이언트 초기화
 openai_client = openai.OpenAI(api_key=API_KEY)
@@ -39,7 +37,7 @@ openai_client = openai.OpenAI(api_key=API_KEY)
 # FastAPI 앱 초기화
 app = FastAPI()
 
-# CORS 허용 (모든 도메인 허용)
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,22 +46,72 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 정적 파일 및 index.html 라우팅
+# 정적 파일 서빙
 app.mount("/static", StaticFiles(directory="public", html=True), name="static")
 
 @app.get("/")
 async def serve_index():
     return FileResponse(os.path.join(os.path.dirname(__file__), "public", "index.html"))
 
-@app.post("/ask")
-async def ask(request: Request):
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...)):
+    try:
+        logger.info(f"Received audio file: {audio.filename}")
+        suffix = mimetypes.guess_extension(audio.content_type or '') or ".webm"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+            contents = await audio.read()
+            if not contents:
+                raise ValueError("오디오 파일이 비어있습니다.")
+            temp.write(contents)
+            temp.flush()
+            temp_path = temp.name
+
+        def get_audio_info(path):
+            try:
+                result = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=format_name",
+                     "-of", "default=noprint_wrappers=1:nokey=1", path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=5
+                )
+                return result.stdout.strip()
+            except Exception as e:
+                return f"ffprobe error: {str(e)}"
+
+        detected_format = get_audio_info(temp_path)
+        logger.info(f"Detected audio format: {detected_format}")
+
+        try:
+            with open(temp_path, "rb") as f:
+                transcript = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f,
+                    response_format="json",
+                    language="ko"
+                )
+        finally:
+            os.remove(temp_path)
+
+        logger.info(f"Transcript: {transcript.text}")
+        return {"text": transcript.text or ""}
+
+    except Exception as e:
+        logger.exception("STT 처리 중 오류")
+        return JSONResponse(status_code=500, content={"error": f"STT 오류: {str(e)}"})
+
+
+@app.post("/speak")
+async def speak(request: Request):
     try:
         body = await request.json()
         messages = body.get("messages", [])
-        logger.info(f"Received messages: {messages}")
+        voice = body.get("voice", "nova")
 
         if not messages:
-            return JSONResponse(status_code=400, content={"error": "메시지가 제공되지 않았습니다."})
+            return JSONResponse(status_code=400, content={"error": "messages 필드가 필요합니다."})
 
         tools = [
             {
@@ -121,87 +169,45 @@ async def ask(request: Request):
                     "content": str(tool_result)
                 }
             ]
+
+            final_response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages
+            )
+            gpt_text = final_response.choices[0].message.content.strip()
         else:
-            messages += [first_response.choices[0].message]
+            gpt_text = first_response.choices[0].message.content.strip()
 
-        def stream_gpt():
-            try:
-                second_response = openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=messages,
-                    stream=True
-                )
-                for chunk in second_response:
-                    delta = chunk.choices[0].delta
-                    if hasattr(delta, "content") and delta.content:
-                        yield delta.content
-            except Exception as e:
-                error_msg = f"[스트리밍 중 오류: {str(e)}]"
-                logger.error(error_msg)
-                yield error_msg
+        if not gpt_text:
+            return JSONResponse(content={"text": "", "audio": ""})
 
-        return StreamingResponse(stream_gpt(), media_type="text/plain")
-
-    except Exception as e:
-        logger.exception("/ask 처리 중 예외 발생")
-        return JSONResponse(status_code=500, content={"error": f"서버 오류: {str(e)}"})
-
-
-# ffprobe를 이용해 실제 포맷 확인 함수
-def get_audio_info(path):
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=format_name",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                path
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=5
+        audio_response = openai_client.audio.speech.create(
+            model="gpt-4o-mini-tts",
+            input=gpt_text,
+            voice=voice,
+            response_format="mp3"
         )
-        return result.stdout.strip()
-    except Exception as e:
-        return f"ffprobe error: {str(e)}"
 
-@app.post("/transcribe")
-async def transcribe(audio: UploadFile = File(...)):
+        audio_bytes = b"".join(audio_response.iter_bytes())
+        encoded_audio = base64.b64encode(audio_bytes).decode("utf-8")
+
+        return JSONResponse(content={
+            "text": gpt_text,
+            "audio": encoded_audio
+        })
+
+    except Exception as e:
+        logger.exception("/speak 처리 중 예외")
+        return JSONResponse(status_code=500, content={"error": f"TTS 오류: {str(e)}"})
+
+
+@app.post("/log")
+async def log_message(request: Request):
     try:
-        logger.info(f"Received audio file: {audio.filename}")
-        logger.info(f"Declared MIME type: {audio.content_type}")
-
-        suffix = mimetypes.guess_extension(audio.content_type or '') or ".webm"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
-            contents = await audio.read()
-
-            if not contents:
-                raise ValueError("업로드된 오디오 파일이 비어있습니다.")
-
-            temp.write(contents)
-            temp.flush()
-            temp_path = temp.name
-
-        # ffprobe로 실제 포맷 확인
-        detected_format = get_audio_info(temp_path)
-        logger.info(f"Detected audio format by ffprobe: {detected_format}")
-
-        # OpenAI Whisper STT 요청
-        try:
-            with open(temp_path, "rb") as f:
-                transcript = openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    response_format="json",
-                    language="ko"
-                )
-        finally:
-            os.remove(temp_path)
-
-        logger.info(f"Transcript: {transcript.text}")
-        return {"text": transcript.text or ""}
-
+        data = await request.json()
+        msg = data.get("message", "")
+        logger.info(f"[CLIENT LOG] {msg}")
+        return {"status": "ok"}
     except Exception as e:
-        logger.exception("/transcribe 처리 중 예외 발생")
-        return JSONResponse(status_code=500, content={"error": f"STT 처리 중 오류: {str(e)}"})
+        logger.error(f"로그 수신 중 오류: {str(e)}")
+        return JSONResponse(status_code=400, content={"error": str(e)})
