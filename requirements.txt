@@ -1,6 +1,6 @@
-fastapi
-uvicorn
-openai
-requests
-python-dotenv
-pytz
+fastapi==0.115.12
+uvicorn==0.34.3
+openai==1.86.0
+requests==2.32.4
+python-dotenv==1.1.0
+pytz==2025.2
