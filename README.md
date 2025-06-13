@@ -31,6 +31,7 @@ MCP_SERVER_URL=http://localhost:8001/mcp
    ```bash
    pip install -r requirements.txt
    ```
+   위 파일에 명시된 버전들은 테스트된 조합입니다.
 2. MCP 서버 실행
    ```bash
    uvicorn mcp_demo.mcp_server:app --port 8001
