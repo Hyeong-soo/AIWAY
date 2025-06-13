@@ -1,3 +1,10 @@
+"""
+Minimal MCP server exposing tools via a JSON-RPC interface.
+
+Tools are registered in `TOOL_REGISTRY` mapping method names to callables.
+The `/mcp` endpoint dispatches incoming requests to the appropriate tool.
+"""
+
 from fastapi import FastAPI, Request
 from .tools import time_tool
 from .mcp_schema import MCPRequest, MCPResponse

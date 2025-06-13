@@ -1,3 +1,13 @@
+"""
+FastAPI server providing STT, chat completion and TTS endpoints.
+
+Endpoints:
+- `/` serves the demo page.
+- `/transcribe` converts uploaded audio to text.
+- `/speak` engages GPT, uses MCP tools if needed, and returns text with speech.
+- `/log` records client log messages.
+"""
+
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
