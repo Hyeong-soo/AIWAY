@@ -44,6 +44,14 @@ curl -X POST http://localhost:8001/mcp \
      -d '{"jsonrpc":"2.0","method":"get_current_time","params":{},"id":"1"}'
 ```
 
+## 테스트
+
+`pytest` 명령으로 테스트를 실행할 수 있습니다.
+
+```bash
+pytest
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
