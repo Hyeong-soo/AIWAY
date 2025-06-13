@@ -11,7 +11,14 @@
 
 ## 환경 변수
 
-`.env` 파일에 다음 값을 설정해야 합니다.
+`.env.template` 파일을 `.env` 로 복사한 후 값을 채워 넣어야 합니다.
+다음 명령어로 파일을 생성할 수 있습니다.
+
+```bash
+cp .env.template .env
+```
+
+`.env.template` 파일을 참고하면 환경 변수 예시를 볼 수 있습니다.
 
 ```env
 OPENAI_API_KEY=여기에-OpenAI-키를-입력하세요
